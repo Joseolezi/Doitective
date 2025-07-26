@@ -1,3 +1,5 @@
+# oapi_fetch.py
+
 from apa7 import generate_apa_reference_7
 from config import common  # si lo tienes como dict Python cargado
 import asyncio
@@ -5,53 +7,33 @@ import httpx
 import style as s
 doi_field = common["fields"]["doi"]
 doi_field = "DOI" 
-
+from common import get_oa
 N_calls = 0
 N_enriched = 0
 is_enriching = True  # Controla cuándo detener el spinner
 import asyncio
 import sys
+import g_vars as v
 
-async def spinner_task():
+async def spinner_task(unique_N, size):
     import itertools
     spinner = itertools.cycle(["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
     while is_enriching:
-        sys.stdout.write(f"\r{next(spinner)} Enriched: {N_enriched} | API Calls: {N_calls} ")
+        sys.stdout.write(s.info + f"\r{next(spinner)} Enriched: {unique_N} | " + s.error + f"📞 API Calls: {N_calls} ")
         sys.stdout.flush()
         await asyncio.sleep(0.1)
-    print(f"\r✅ Enrichment complete! Total: {N_enriched} records enriched in {N_calls} calls.")
+    print(s.warning + f"\r📀 Enrichment completed! " + s.dim_white + f"Report: " + s.success + f"{unique_N}" + s.magenta + f"/" + s.info + f"{size}" + s.dim_white + f" records enriched in " + s.error + f"{N_calls} calls 📞")
 
 ############# OPEN ALEX BATCH ENRICHMENT ###############
 OPENALEX_BATCH_URL = "https://api.openalex.org/works"
-MAILTO = "jfan2@hotmail.com"  # Editable por usuario
+MAILTO = None  # Editable por usuario
 MAX_BATCH_SIZE = 25
 SUB_BATCH_SIZE = 10
 MAX_RETRIES = 3
 TIMEOUT = 10
 
-def default_entry_data(doi, user_base_origin):
-    return {
-        'DOI': doi,
-        #'Title': '',
-        #'Year': '',
-        #'Abstract': '',
-        #'Authors': '',
-        'Found in': user_base_origin,
-        #'Indexed in': '',
-        'OpenAlex API': "Not Found by OpenPrisma",
-        #'is_oa': 'false',
-        'oa_status': 'Unknown',
-        'oa_url': '',
-        'pdf url': '',
-        'cited by count': '',
-        'citation normalized percentile (value)': '',
-        #'ISSN': '',
-        'Volume': '',
-        'Issue': '',
-        'Pages': '',
-        #'APA reference': ''
-    }
 
+                
 def format_authors_apa7(authors_str):
     if not authors_str:
         return "Unknown Author"
@@ -138,41 +120,11 @@ def title_case(text):
             result.append(lower_word)
     return "".join(result)
 
-def generate_apa_reference_7(entry):
-    authors = format_authors_apa7_full(entry.get('Authors', ''))
-    year = entry.get('Year', '')
-    year_text = f"({year})" if year else "(n.d.)"
-    title = sentence_case(entry.get('Title', '').strip())
-    journal = entry.get('Indexed in', '').strip()
-    journal = title_case(journal)
-    volume = entry.get('Volume', '').strip()
-    issue = entry.get('Issue', '').strip()
-    pages = entry.get('Pages', '').strip()
-    doi = entry.get('DOI', '').strip()
 
-    vol_issue = ""
-    if volume:
-        vol_issue = volume
-        if issue:
-            vol_issue += f"({issue})"
-    pages_text = f", {pages}" if pages else ""
-
-    # Armado referencia:
-    # Apellido, I. I., & Apellido, I. I. (Año). Título del artículo. *Nombre de la Revista*, volumen(número), páginas. https://doi.org/xxxxx
-    ref = f"{authors} {year_text}. {title}. "
-    if journal:
-        ref += f"*{journal}*"
-        if vol_issue:
-            ref += f", *{vol_issue}*"
-        ref += pages_text + ". "
-    else:
-        ref += ". "
-    if doi:
-        ref += f"https://doi.org/{doi}"
-    return ref.strip()
 N_calls= 0
 async def fetch_batch(client, dois):
     # Limpiar y normalizar DOIs antes de la query
+ 
     global N_calls
     N_calls += 1
     cleaned_dois = set()
@@ -185,7 +137,7 @@ async def fetch_batch(client, dois):
     filter_value = "|".join(dois)
     params = {
         "filter": f"doi:{filter_value}",
-        "mailto": MAILTO
+        "mailto": v.get_var('mailto')
     }
     for attempt in range(1, MAX_RETRIES + 1):
         try:
@@ -204,20 +156,21 @@ async def fetch_batch(client, dois):
            
 def update_enrichment_counter(n):
     print(f"🔄 " + s.warning + f"Enriched records: " + s.info + f"{n}", end='', flush=True)
-    
-async def enrich_with_openalex(entries):
+
+async def enrich_with_openalex(entries, size):
+    doi_to_entry = {e['DOI'].replace("https://doi.org/", "").lower(): e for e in entries if e.get('DOI')}
     enriched_entries = []
     global is_enriching, N_calls, N_enriched
     N_calls = 0
     N_enriched = 0
     is_enriching = True
 
-    spinner = asyncio.create_task(spinner_task())
+    spinner = asyncio.create_task(spinner_task(len(entries), size))
     
     async with httpx.AsyncClient() as client:
-        doi_to_user_base = {e['DOI'].replace("https://doi.org/", "").lower(): e.get('Found in', '') for e in entries if e.get('DOI')}
+        doi_to_user_base = {e['DOI'].replace("https://doi.org/", "").lower(): e.get('base_origin', '') for e in entries if e.get('DOI')}
         all_dois = list(doi_to_user_base.keys())
-
+        
         batches = [all_dois[i:i+MAX_BATCH_SIZE] for i in range(0, len(all_dois), MAX_BATCH_SIZE)]
 
         async def process_batch(batch):
@@ -233,8 +186,9 @@ async def enrich_with_openalex(entries):
                     return results
                 else:
                     print(f"Sub-batch of size {len(batch)} failed permanently.")
-                    return [default_entry_data(doi, doi_to_user_base.get(doi, '')) for doi in batch]
-
+                    return [doi_to_entry(doi, doi_to_user_base.get(doi, '')) for doi in batch]
+                
+            
             found_dois = set()
             enriched = []
             for item in data.get('results', []):
@@ -244,56 +198,55 @@ async def enrich_with_openalex(entries):
                 N_enriched += 1
                 authors_list = [auth.get('author', {}).get('display_name', '') for auth in item.get('authorships', [])]
                 authors_str = ", ".join(filter(None, authors_list))
-
+                base_origin = doi_to_user_base.get(doi, 'Unknown')
                 # Extraer volumen, issue y páginas si están (OpenAlex puede tener 'volume', 'issue', y 'biblio' para páginas)
                 volume = item.get('biblio', {}).get('volume', '') or item.get('volume', '')
                 issue = item.get('biblio', {}).get('issue', '') or item.get('issue', '')
                 pages = item.get('biblio', {}).get('pages', '') or item.get('pages', '')
                 oa_info = item.get('open_access', {})
-                is_oa = oa_info.get('is_oa', False)
-                oa_status = oa_info.get('oa_status', 'Unknown').capitalize()
+                oa_status = oa_info.get('oa_status', 'Unknown').lower
+                
+                is_oa, oa_url = get_oa(item)
                 value = item.get('citation_normalized_percentile')
                 if isinstance(value, dict):
                     citation_percentile = value.get('value', '')
                 else:
                     citation_percentile = value if value is not None else ''
+                    
                 entry = {
+                    #'Doitective notes': ''
                     'DOI': doi,
+                    'Open Access?': str(is_oa).lower(),
                     'Title': item.get('title', ''),
                     'Year': item.get('publication_year', ''),
-                    # 'Abstract' se conserva del original, no se sobrescribe aquí // 'Abstract': item.get('abstract', ''),
-                    
-                    # Esta variable se refiere a lo que aporta el user // 'User base origin': doi_to_user_base.get(doi, ''), 
-                    "Indexed in": ", ".join([
-                        i.get("display_name", "") for i in item.get("indexed_in", []) if isinstance(i, dict)]),
-                    'OpenAlex API': f"{OPENALEX_BATCH_URL}?filter=doi:{doi}",
-                    'First author': item.get('authorships', [{}])[0].get('author', {}).get('display_name', ''),
-                    'is_oa': str(item.get('open_access', {}).get('is_oa', False)).lower(),
-                    'oa_status': item.get('open_access', {}).get('oa_status', 'Unknown').capitalize(),
-                    'oa_url': item.get('open_access', {}).get('oa_url', ''),
-                    'pdf url': item.get('primary_location', {}).get('url', ''),
-                    'cited by count': item.get('cited_by_count', ''),
+                    'First author': item.get('authorships', [])[0].get('author', {}).get('display_name', '') if item.get('authorships') else '',
+                    # 'Origin database': # NO LO TOQUES
+                    'Indexed in': ", ".join(item.get('indexed_in', [])),
+                    #'Copies': '',
+                    'OpenAlex API': f"{OPENALEX_BATCH_URL}?filter=doi:{doi}",                    
+                    'Open Access status': item.get('open_access', {}).get('oa_status', 'Unknown').capitalize(),
+                    'OA best pdf url': oa_url,
+                    'Cited by count': item.get('cited_by_count', ''),
+                    'Citation normalized percentile': citation_percentile,
                     'Concepts': ", ".join([c.get('display_name', '') for c in item.get('concepts', [])]),
                     'ISSN': item.get('host_venue', {}).get('issn_l', ''),
                     'Authors': ", ".join([item.get('author').get('display_name', '') for item in item.get('authorships', [])]),
+                    'APA 7 reference': '',  # Se genera abajo
                     'Volume': volume,
                     'Issue': issue,
                     'Pages': pages,
-                    'APA reference': '',  # Se genera abajo
-                    'citation normalized percentile (value)': citation_percentile,
+                    # 'Abstract' se conserva del original, no se sobrescribe aquí // 'Abstract': item.get('abstract', ''),
+                    
                 }   
                 entry['APA reference'] = generate_apa_reference_7(entry)
                 entry['Open Access'] = oa_status
-                entry['is_oa'] = str(is_oa).lower()
                 enriched.append(entry)
-
-
 
             missing_dois = set(batch) - found_dois
             for doi in missing_dois:
-                default_entry = default_entry_data(doi, doi_to_user_base.get(doi, ''))
-                default_entry['APA reference'] = generate_apa_reference_7(default_entry)
-                enriched.append(default_entry)
+                original_entry = doi_to_entry.get(doi)
+                if original_entry:
+                    enriched.append(original_entry) 
 
             return enriched
 

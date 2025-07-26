@@ -1,6 +1,6 @@
 {
-    "input_folder": "[__RAW_DATA__]",
-    "output_folder": "[__SCRENNED_DATA__]/",
+    "input_f": "[__RAW_DATA__]",
+    "output_folder": "[__SCREENED_DATA__]/",
     "language": "en",
     "fields": {
         "doi": "DOI",
@@ -31,11 +31,11 @@
         "data_normalized": "Data normalized successfully",
         "data_saved": "Data saved to {file}",
         "error_saving_data": "Error saving data to {file}",
-        "start_message": "📂 Scanning input folder and initializing OpenPrisma...",
-        "no_valid_files": "⚠️ No valid files found in the input folder.",
+        "start_message": "📂 Scanning input folder and initializing Doitective...",
+        "no_valid_files": "⚠️  No valid files found in the input folder.",
         "error_reading_file": "❌ Error reading {file}: {error}",
         "no_data_parsed": "🚫 No records were successfully parsed or normalized.",
-        "finished": "\n✅ Processing complete! ",
+        "finished": "\n✅ Processing completed! ",
         "enriching_openalex": "Querying OpenAlex data...",
         "invalid_file_format": "Invalid file format: {file}"
     },
@@ -47,11 +47,11 @@
         "data_normalized": "Datos normalizados exitosamente",
         "data_saved": "Datos guardados en {file}",
         "error_saving_data": "Error al guardar los datos en {file}",
-        "start_message": "📂 Escaneando la carpeta de entrada e iniciando OpenPrisma...",
-        "no_valid_files": "⚠️ No se encontraron archivos válidos en la carpeta de entrada.",
+        "start_message": "📂 Escaneando la carpeta de entrada e iniciando Doitective...",
+        "no_valid_files": "⚠️  No se encontraron archivos válidos en la carpeta de entrada.",
         "error_reading_file": "❌ Error al leer {file}: {error}",
         "no_data_parsed": "🚫 No se pudo analizar ni normalizar ningún registro.",
-        "finished": "\n✅ ¡Procesamiento completo! ",
+        "finished": "\n✅ ¡Procesamiento completado! ",
         "enriching_openalex": "Consultando datos de OpenAlex...",
         "invalid_file_format": "Formato de archivo no válido: {file}"
     }

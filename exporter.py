@@ -1,6 +1,54 @@
+# exporter.py
 import os
 import pandas as pd
 import style as s
+import asyncio
+import itertools
+import sys
+import time
+
+async def end_anim ():
+    await spinner_task ()
+    
+async def spinner_task(duration=6):
+    walk_off = itertools.cycle([
+        "👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣🔍👀💼",
+        "👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣🔍👀💼   ",
+        "👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣🔍👀💼      ",
+        "👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣🔍👀💼         ",
+        "👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣🔍👀💼            ",
+        "👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣👣🔍👀💼              ",
+        "👣👣👣👣👣👣👣👣👣👣👣👣👣👣🔍👀💼                   ",
+        "👣👣👣👣👣👣👣👣👣👣👣👣👣🔍👀💼                      ",
+        "👣👣👣👣👣👣👣👣👣👣👣👣🔍👀💼                        ",
+        "👣👣👣👣👣👣👣👣👣👣👣🔍👀💼                           ",
+        "👣👣👣👣👣👣👣👣👣👣🔍👀💼                             ",
+        "👣👣👣👣👣👣👣👣👣🔍👀💼                                ",
+        "👣👣👣👣👣👣👣👣🔍👀💼                                   ",
+        "👣👣👣👣👣👣👣🔍👀💼                                      ",
+        "👣👣👣👣👣👣🔍👀💼                                        ",
+        "👣👣👣👣👣🔍👀💼                                           ",
+        "👣👣👣👣🔍👀💼                                              ",
+        "👣👣👣🔍👀💼                                                 ",
+        "👣👣🔍👀💼                                                    ",
+        "👣🔍👀💼                                                      ",
+        "🔍👀💼                                                         ",
+        "👀💼                                                           ",
+        "💼                                                              ",
+        "                                                                 "
+    ])
+
+
+    start = time.time()
+    while time.time() - start < duration:
+        frame = next(walk_off)
+        sys.stdout.write(f"\r{next(walk_off)}")
+        sys.stdout.flush()
+        await asyncio.sleep(0.5)
+
+    print("\n🛑 Exiting...")
+    exit (0)
+
 def export_results(unique_oa, paywall, duplicates, fieldnames, session_folder):
     # Asegurarse que la carpeta existe
     os.makedirs(os.path.join(session_folder, 'excel'), exist_ok=True)
@@ -30,4 +78,5 @@ def export_results(unique_oa, paywall, duplicates, fieldnames, session_folder):
 
     print(f"Exported Excel to: {excel_path}")
     print(f"Exported CSVs to folder: {os.path.join(session_folder, 'csv')}")
-    print(f"\n\t\t" + s.cyan + "💠 Thank you for using OpenPrisma 💠\n\n\n")
+    print(f"\n\t\t" + s.cyan + f" Investigation completed. Your reports are in {session_folder}. Thank you for trusting doitective 👣🔍👀💼 Goodbye!")
+

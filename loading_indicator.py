@@ -1,7 +1,9 @@
+# loading_indictaor.py
+
 import asyncio
 import itertools
 import sys
-
+import style as s
 class LoadingIndicator:
     def __init__(self):
         self.running = False
@@ -68,4 +70,4 @@ async def enrich_with_spinner(all_dois):
     stop_spinner = True
     await spinner_task  # Esperamos a que acabe el spinner limpio
 
-    print("\n✅ Enrichment complete!")
+    print(s.warning + f"\n📀 Enrichment completed!")

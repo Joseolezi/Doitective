@@ -3,7 +3,7 @@
 version = "1.0.0"
 author = "jf2"
 author_email = "jfan2@hotmail.com"
-author_website = "joseolezi.github.io/<>"
+author_website = "joseolezi.github.io/dev"
 
 from colorama import Fore, Back, Style, init
 init(autoreset=True)
@@ -14,8 +14,8 @@ init(autoreset=True)
 version = "1.0.0"
 author = "jf2"
 author_email = "jfan2@hotmail.com"
-author_website = "joseolezi.github.io/<>"
-author_patreon = "example_patreon_ex"
+author_website = "joseolezi.github.io/dev"
+author_patreon = "example.ex"
 # =====================
 # Text Styles & Colors
 # =====================
@@ -50,6 +50,16 @@ grey        = Fore.BLACK + Style.BRIGHT
 # =====================
 # Icons & Symbols
 # =====================
+i_detective = '🕵️‍♂️'
+i_detectiva = '🕵️‍♀️'
+i_lupa = '🔍'
+i_file = '🗃️'
+i_books = '📚'
+i_brain = '🧠'
+i_m_tective = '🕵️‍♂️💼'
+i_2_detective = '🕵️‍♂️🕵️‍♀️' 
+i_eye = '👁️‍🗨️'
+i_objective = '🎯'
 i_success    = "✓"
 i_warning    = "!"
 i_error      = "✗"
@@ -110,3 +120,4 @@ i_thanks     = "🙌"
 reset = Style.RESET_ALL
 key   = magenta
 data  = cyan
+
