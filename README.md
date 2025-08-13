@@ -63,7 +63,7 @@ This repository is **source-available for evaluation only** under the
 - Not allowed without prior written permission: **running, compiling, modifying, redistributing, hosting, forking**, academic or commercial use, or any other use beyond viewing/evaluation.
 - Explicitly forbidden: use by entities that profit from restricting access to scientific knowledge or that sell access to data/tools without open access to their datasets.
 
-For any permission (personal, academic, or commercial), contact **tu-email@ejemplo.com**.  
+For any permission (personal, academic, or commercial), contact **jose.f2@outlook.es**.  
 See full terms in [`LICENSE.txt`](LICENSE.txt).
 
 
