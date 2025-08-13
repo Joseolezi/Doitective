@@ -1,16 +1,47 @@
+# SPDX-License-Identifier: LicenseRef-DSA-EOL-1.0
+# Copyright (c) 2025 José Fandos. All Rights Reserved.
+
+"""
+Doitective — source-available (evaluation-only).
+See LICENSE.txt for terms and contact for any permission beyond viewing.
+"""
 # main.py
-from ui import update_UI
+from modules.ui import update_UI
 import os
 import json
 import datetime
-from ui import update_UI
+from modules.ui import update_UI
 import shutil
-from exporter import export_results, end_anim
-from oapi_fetch import enrich_with_openalex
+from modules.processors.exporter import export_results
+from modules.processors.oapi_batch import enrich_with_openalex, enrich_with_openalex_full, enrich_with_openalex_titles
 import asyncio
-from loading_indicator import LoadingIndicator
-import style as s
-import g_vars as v
+from modules.loading_indicator import LoadingIndicator
+import utils.style.styles as s
+import modules.memory as m
+from modules.users.e_mail_validation import verify_email as ve, fetch_variable_in_txt as fvt
+import sys
+from datetime import datetime
+import modules.texts as t
+from modules.processors.final_sort import classify_records_from_marked_sheets
+
+
+log_filename = datetime.now().strftime("logs/log_%Y-%m-%d_%H-%M-%S.txt")
+log_file = open(log_filename, "w", encoding="utf-8")
+# Redirigir stdout a consola y archivo
+class DualOutput:
+    def __init__(self, *outputs):
+        self.outputs = outputs
+    def write(self, text):
+        for output in self.outputs:
+            output.write(text)
+            output.flush()
+    def flush(self):
+        for output in self.outputs:
+            output.flush()
+
+sys.stdout = DualOutput(sys.stdout, log_file)
+sys.stderr = sys.stdout  # opcional: captura también errores
+
 # Clean screen without losing info
 def soft_clear_to_top():
     lines = shutil.get_terminal_size().lines
@@ -18,134 +49,214 @@ def soft_clear_to_top():
     6
 
 def getmailto_txt ():
-    filename = 'mailto.txt'
+    filename = 'user_settings.txt'
     if os.path.isfile(filename):
         if os.path.getsize(filename) > 0:
             with open(filename, 'r', encoding='utf-8') as f:
                 content = f.read()
-                v.set_var('mailto', content)
-
+                m.set('mailto', content)
 # AutoRef UI MANAGER
 # Main entry point for the AutoRef application
 def run(key):
+    CLASSIFY_FOLDER = m.get("classify_folder")
     next_step = key
-    while next_step not in ['start', 'exit']:
-        next_step = update_UI(next_step)
-    if next_step == 'start':    
+
+    if key not in ['1', 'launch', 'exit', '']:
+        # UI loop: continuar hasta recibir un comando válido
+        while next_step not in ['1', 'launch', 'exit']:
+            next_step = update_UI(next_step)
+        
+    # Ejecutar acción según el valor final
+    if str(next_step) == '1':
+        classify_records_from_marked_sheets(CLASSIFY_FOLDER)
+    elif next_step == 'launch':
         asyncio.run(main())
-    if next_step == 'exit':
+    elif next_step == 'exit' or '':
+        print("Exiting Doitective 👣🔍👀💼 Goodbye!")
         exit(0)
 
 # Load localization strings
-with open('localization.json', 'r', encoding='utf-8') as f:
+with open('utils/localization/base_loc.json', 'r', encoding='utf-8') as f:
     localization = json.load(f)
     language = localization.get("language", "en")
-    texts = localization.get(language, {})
+    l_texts = localization.get(language, {})
 soft_clear_to_top ()
-print("\t\t" + texts["start_message"] + "\n")
+print("\t\t" + l_texts["start_message"] + "\n")
 
 # Define input folder
-INPUT_FOLDER = localization.get("input_f")
 
+INPUT_FOLDER = localization.get("input_f")
+STANDARD_FIELDS = m.get('standard_fields')
+def clean_for_export(entries):
+    exportable = STANDARD_FIELDS
+    for entry in entries:
+        exportable.append({k: v for k, v in entry.items() if not k.startswith('_')})
+    return exportable
 ################ MAIN ####################
-from screening import normalize_entry, deduplicate_by_doi, separate_by_open_access, split_for_enrichment
-from dbs import load_files_from_raw_folder, detect_origin, last_security_check
+from modules.screening import (separate_by_open_access,
+                            deduplicate_by_ids, classify_records)
+
+from modules.processors.log_machine import export_classification_report as ecr
 
 async def main():
-    print(texts['start_message'])
-    print(s.magenta + "Loading and validating files 📂 \n\n")
 
     # Step 1: Load valid files
-    valid_files = load_files_from_raw_folder(INPUT_FOLDER)
-    if not valid_files:
-        print(texts['no_valid_files'])
-        return
-
-    openalex_stack = []
-    all_normalized = []
-    # Step 2: Detect origin and process files
-    for file_path in valid_files:
-        try:
-            records, origin, is_openalex = detect_origin(file_path, openalex_stack)    
-            print(s.error + f"📌 Detected origin: {origin} — {os.path.basename(file_path)}")
-
-            if is_openalex:
-                continue # ya fue agregado a openalex_stack
-            
-            filename = os.path.basename(file_path)
-            for record in records:
-                assert isinstance(record, dict), f"❌ record is not a dict: {record}" # DEBBUGING
-                normalized = normalize_entry(record, origin, filename) #!! SOLUCIÓN SALOMÓNICA
-                all_normalized.append(normalized)
-
-        except Exception as e:
-            print(texts['error_reading_file'].format(file=os.path.basename(file_path), error=str(e)))
-        
-    # Agregamos OpenAlex ya normalizado
-    all_normalized.extend(openalex_stack)
-
-    if not all_normalized:
-        print(texts['no_data_parsed'])
-        return
-    # Añadimos default entry data
-    # Step 4: Deduplicate
-    unique, duplicates = deduplicate_by_doi(all_normalized)
-    N_dups = len(duplicates)
-    N_unique = len (unique)
-    print(s.success + f" ✔  {N_unique} Unique records identified")
-    print(s.error + f"🧦 {len(duplicates)} Duplicated records identified \n")
-
-    # Step 4.5: Separate openalex unique from poor unique
-    from_openalex, to_enrich = split_for_enrichment(unique)
-    for entry in from_openalex:
-        doi = entry.get('DOI', '')
-        if doi and not doi.startswith('http'):
-            entry['DOI'] = f'https://doi.org/{doi}'
-    # Step 5: Enrichment with OpenAlex  
-    print(s.magenta + f"OpenAlex native records: " + s.success + f"{len(from_openalex)}")
-    print(s.info + f"Weak records: " + s.error + f"{len(to_enrich)}")  
-        # Empieza la animación
-    unique_final = [] 
-    paywall = []
-    indicator = LoadingIndicator()
-    L_to_enrich = len(to_enrich)
-    try:
-        indicator.update_message(s.dim_white + f"Enriching " + s.warning + f"{L_to_enrich}" + s.dim_white + f" weak records with OpenAlex ⚡")
-        print(s.dim_white + f"Enriching " + s.warning + f"{L_to_enrich}" + s.dim_white + f" weak records with OpenAlex ⚡")
-        unique_final = from_openalex + await enrich_with_openalex(to_enrich, L_to_enrich) 
-
-    finally:
-        await indicator.stop()  # Detiene el spinner
-        print(texts['finished']) 
-        # Último check de seguridad
-       # unique_final = last_security_check(unique_final)
-        N_unique = len(unique_final)  
+    from modules.processors.dbs_main import parse_input_data
     
+    all_normalized, not_articles = parse_input_data ()
+   
+        # Mostrar resumen
+    print(f"\n" + s.info + f"Total records identified: " + s.magenta + f"{len(all_normalized)}")
+    print(f"{s.dim_white}Discarted non-articles: {len(not_articles)}")
+    if not all_normalized:
+        print(l_texts['no_data_parsed'])
+        return
+    ######################################################################
+    total_raw = len(all_normalized) + len(not_articles)
+    # Step 4: Deduplicate
+    unique, duplicates, remaining = deduplicate_by_ids(all_normalized)
+    N_dups = len(duplicates)
+    N_unique = len(unique)
+    print(s.success + f" ✔ {N_unique} Unique records identified")
+    print(s.error + f"🧦 {len(duplicates)} Duplicated records detected \n")
+    remaining_l = len(remaining)
+    # Step 4.5: Separate openalex unique from poor unique
+    oat, closedt, not_known = separate_by_open_access(unique)
+    oa_b4 = len(oat)
+    closed_b4 = len(closedt)
+    
+    doi_group, pmid_group, title_group, errors = classify_records (unique)
+    
+    errors_l = len(errors)
+    not_articles_l = len(not_articles)
+    print(f"Preliminary scan result:")
+    print(f"NOT ARTICLES: {not_articles_l}")
+    print(f"ERRORS: {errors_l}")
+    print(f"REMAINING: {remaining_l} \n")
+    print(s.warning + f"valid ID quality breakdown")
+    print(s.info + f"DOI: " + s.success + f"{len(doi_group)}")    
+    print(s.info + f"PMID: " + s.warning + f"{len(pmid_group)}")    
+    print(s.info + f"Title: " + s.error + f"{len(title_group)}")    
+    # Agrupar según mejor identificador
+    for d in duplicates: 
+        d.update({'Doitective': "0: Ineligible: Duplicated"})
+    for e in errors:
+        e.update({'Doitective': '0: Ineligible: Unkown valid ID'})
+    for na in not_articles:
+        na.update({'Doitective': "0: Ineligible: 'matches exclusion criteria: not an Article'"})
+    for r in remaining: 
+        r.update({'Doitective': "0: Doitective couldn't resolve this mistery"})
+    ineligible = not_articles + errors + remaining
+    
+    ######################################################################
+    pre_title_group = title_group
+    indicator = LoadingIndicator()
+    try:
+        indicator.update_message(s.dim_white + f"Enriching " + s.warning + f"{len(doi_group + pmid_group + title_group)}" + s.dim_white + f" weak records with OpenAlex ⚡")
+        doi_group_result = await enrich_with_openalex(doi_group, 'doi')
+        pmid_group_result = await enrich_with_openalex(pmid_group, 'pmid')
+        # title_group_result = await enrich_with_openalex_titles(title_group)
+        doi_group, fb_dois = doi_group_result
+        pmid_group, fb_pmids = pmid_group_result
+     #   title_group, fb_titles = title_group_result
+    finally:
+        await indicator.stop()
+        print(l_texts['finished'])
+    fallback_final = fb_dois + fb_pmids # + fb_titles
+    unique_final = doi_group + pmid_group + title_group + fallback_final
+    print(s.warning + f"OAPI batchcalling breakdown")
+    print(s.dim_white + f'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    print(f'» Enriched records by ' + s.success + f'DOI: {len(doi_group)}/' + s.dim_white + f'{len(doi_group+fb_dois)}')
+    print(f'» Enriched records by ' + s.warning + f'PMID: {len(pmid_group)}/' + s.dim_white + f'{len(pmid_group+fb_pmids)}')
+  #  print(f'» Enriched records by ' + s.error + f'title: {len(title_group)}/' + s.dim_white + f'{len(title_group+fb_titles)}')
 
-    # Step 7: Separar OA vs Paywall usando info actualizada
-    unique_oa, paywall = separate_by_open_access(unique_final)
+    total_enriched = len(doi_group) + len(pmid_group) + len(title_group)
+    base_enriched = total_enriched + len(fallback_final)
+
+            # Último check de seguridad: OAID
+        # unique_final = last_security_check(unique_final)
+    
+        # Step 7: Separar OA vs Paywall usando info actualizadr
+    unique_oa, paywall, unk_entries = separate_by_open_access(unique_final)
     N_oa = len(unique_oa)
     N_pw = len(paywall)
-
-    # Esto los contea y displayea en la consola - ES MIERDA DE FEO
+    N_dups = len(duplicates)
+    N_no_art = len(not_articles)
+    N_errors = len(errors)
+    db_sources = m.get("database_sources")
+    db_sources = ",".join(sorted(db_sources))
+    doit_version = m.get("doit_version")
+    prisma_dict = {
+    "database_sources": db_sources,
+    "other_sources": "",
+    "duplicates_removed": N_dups,
+    "records_screened": N_unique,
+    "records_excluded": "",
+    "full_texts_assessed": "",
+    "full_texts_excluded": "",
+    "full_texts_exclusion_reasons": "",
+    "studies_included": "",
+    "reports_included": "",
+    "final_included": "",
+    "notes": "",
+    "date_exported": datetime.now().strftime("%S-%M-%H_%d-%m-%Y"),
+    "doitective_version": doit_version,
+    "user_id": "Main investigator",
+    "project_name": "Doitective default",
+    "flow_comment": ""
+}
+    not_articles += errors + remaining + unk_entries
+    N_identified = N_unique - N_errors
+    # Esto los contea y displayea en la consola 
     #from collections import Counter
     #summary = Counter([e.get("base_origin", "Unknown") for e in unique_final])
     #print(summary)
-    
-    print(s.success + f"🧠 Unique Open Access records: {N_oa}")
-    print(s.error + f"💸 Unique PayWall records: {N_pw}")
-    print(s.warning + f"🧦  Duplicates dumped: {N_dups} \n")
-    # Step 8: Export everything
-    print(s.magenta + "\t\t     🎁 Packaging final data 🎁\n")
-    from screening import STANDARD_FIELDS
-    OUTPUT_FOLDER = localization.get("output_folder")
-    SESSION_FOLDER = os.path.join(OUTPUT_FOLDER + f"output_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    print("\n" + s.title + f"     >> " + s.dim_white + "FINAL STATS REPORT " + s.title + f"<<")
+    print(s.dim_white+ f"📂 All records extracted from raw folder: {total_raw}")
+    print(s.title + f"🧦 Duplicates: " + s.title + f"{N_dups}")
+    print(s.error + f"📰 Not " + s.dim_white + f"articles: " + s.error + f"{N_no_art}")
+    print(s.dim_white+ f"🔎 Unique records scoped: " + s.info + f"{N_unique}")
+    print(s.dim_white + f"🤔 Unknown records: {N_errors}\n")
+    print(s.dim_white+ f"\t📌 Unique records successfully identified: " + s.info + f"{len(unique_final)}")
+    print(s.dim_white+ f"\t📀 Unique records enriched: " + s.warning + f"{total_enriched}" + s.dim_white + " / " + f"{base_enriched}")
+    print(s.success + f"\t🔑 Unique Open Access " + s.dim_white + f"records: {oa_b4} >> " + s.success + f"{N_oa}")
+    print(s.warning + f"\t🚧 Unique Restricted " + s.dim_white + f"records: {closed_b4} >> " + s.warning + f"{N_pw}\n")
 
-    export_results(unique_oa, paywall, duplicates, fieldnames=STANDARD_FIELDS , session_folder=SESSION_FOLDER)
-    end_anim ()
+    
+    # Step 8: Export everything
+    print(s.dim_white + f"\t🎁 Packaging final data 🎁\n")
+    
+    SESSION_FOLDER = os.path.join(OUTPUT_FOLDER, datetime.now().strftime("Doitective_works__%Y-%m-%d_%H-%M-%S"))
+    STANDARD_FIELDS = m.get('standard_fields')
+    export_results(unique_oa, paywall, duplicates, ineligible, fieldnames=STANDARD_FIELDS , session_folder=SESSION_FOLDER)
+
 
 if __name__ == '__main__':
-    from exporter import end_anim
-    getmailto_txt ()
-    run('w')  # Start with the welcome screen
+    mode_key = 'w'
+    OUTPUT_FOLDER = localization.get("output_folder")
+
+ 
+        # Crear archivo con marca de tiempo
+    log_filename = os.path.join(datetime.now().strftime("logs/log_%Y-%m-%d_%H-%M-%S.txt"))
+    log_file = open(log_filename, "w", encoding="utf-8")
+
+    txt_path = 'user_settings.txt'
+    txt_key = 'mailto'
+    mode_key = 'mode'
+    txt_value = fvt(txt_path, txt_key)
+    mode = fvt(txt_path, mode_key)
+    if txt_value is not None:
+        print(f"El valor de '{txt_key}' es: {txt_value}")
+        m.set('mailto', txt_value) 
+    else:
+        print(f"La variable '{txt_key}' no fue encontrada en el archivo.")
+        m.set('mailto', None)   
+    if mode == '2':
+        entry_key = 'w'
+    elif mode == '1':
+        entry_key = '1'
+    
+    run(entry_key)  # Start with the welcome screen
     # This will trigger the UI update and start the application flow
+
+

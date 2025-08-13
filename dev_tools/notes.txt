@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: LicenseRef-DSA-EOL-1.0
+# Copyright (c) 2025 José Fandos. All Rights Reserved.
+
+"""
+Doitective — source-available (evaluation-only).
+See LICENSE.txt for terms and contact for any permission beyond viewing.
+"""
+
+notes.txt
+
+
+# NOTES FOR THE NEXT IMPROVEMENTES #
+
+- Fix harcoded variables
+
+- Tidy modules
+
+- Print a .txt with logs
+
+- Let user decide between available features or data sorting
+
+- Implement [es] language.
+
+- Integrar cómo averiguar el OA de PsyNet, ya que no lo trae nativo. 

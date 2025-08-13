@@ -1,0 +1,58 @@
+Doitective Source-Available Evaluation-Only License (DSA-EOL) v1.0
+Copyright (c) 2025 Jose Fandos
+
+0. Definitions
+   “Software” means the Doitective source code and any accompanying assets.
+   “You” means the individual who accesses the Software.
+   “Evaluation” means reviewing and studying the source code for the sole
+   purpose of understanding its ideas and design, without executing, compiling,
+   modifying, redistributing, or using it to produce outputs for any purpose.
+
+1. Grant of Rights (Viewing Only)
+   Subject to this license, the copyright holder grants You a limited,
+   non-exclusive, non-transferable, revocable right to:
+   (a) view the Software on Git hosting platforms and
+   (b) download/clone only as technically necessary to view it locally,
+   solely for Evaluation.
+
+2. Prohibited Actions (No Use Without Permission)
+   Unless You first obtain the copyright holder’s express written permission,
+   You must NOT:
+   (a) execute, run, compile, build, or otherwise operate the Software;
+   (b) modify, adapt, translate, or create derivative works;
+   (c) redistribute, publish, mirror, fork, host, or make the Software
+       available to any third party, in any form (including public repositories);
+   (d) use the Software, or any part of it, in any product, service,
+       workflow, research, or activity of any kind, whether commercial
+       or non-commercial (including academic), and whether internal or public;
+   (e) use outputs learned from the Software to replicate its functionality
+       (“clean-room reimplementation” is not permitted under this license).
+
+3. Prohibited Entities
+   The Software may NOT be used, accessed beyond Evaluation, or licensed to:
+   organizations or individuals whose activities include restricting access to
+   scientific knowledge for profit (e.g., paywalled scholarly publishers or
+   proprietary database vendors), or selling access to data/tools without open
+   access to their underlying datasets, including their parents, subsidiaries,
+   contractors, and affiliates.
+
+4. No Public Distribution; Linking Allowed
+   You may share a link (URL) to the official repository, but you may not share
+   copies of the Software. Any public posting of the code or derivatives is
+   forbidden without written permission.
+
+5. Termination
+   Any breach of this license immediately and automatically terminates Your
+   rights. After termination, You must cease all use and delete any local copies.
+   Reinstatement is only possible via written permission from the copyright holder.
+
+6. No Warranty; Limitation of Liability
+   THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND. IN NO EVENT
+   SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM
+   OR RELATED TO THE SOFTWARE OR THIS LICENSE.
+
+7. Permission Path (Case-by-Case Licenses)
+   To run, modify, redistribute, or use the Software (including personal,
+   academic, or commercial use), request a written license at:
+   jose.f2@outlook.es.
